@@ -422,7 +422,7 @@ class MainActivity : AppCompatActivity() {
         val saat = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
         logSatirlar.addLast("[$saat] $mesaj")
         if (logSatirlar.size > 80) logSatirlar.removeFirst()
-        logKutu.text = logSatirlar.takeLast(12).joinToString("\n")
+        logKutu.text = logSatirlar.toList().takeLast(12).joinToString("\n")
     }
 
     override fun onResume() {
