@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.speech.RecognitionListener
@@ -82,6 +83,7 @@ class MainActivity : AppCompatActivity() {
         kaydirma.addView(kok)
         setContentView(kaydirma)
         durumYenile()
+        bildirimIzniIste()
     }
 
     // ─── ÜST BAŞLIK ──────────────────────────────────────────────────────
@@ -398,6 +400,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     // ─── DURUM YENİLE ────────────────────────────────────────────────────
+    private fun bildirimIzniIste() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 5001)
+            }
+        }
+    }
+
     private fun durumYenile() {
         val aktif = DomatesAccessibilityService.instance != null
         durumNokta.background = daire(if (aktif) C_YESIL else C_KIRMIZI_ORT)

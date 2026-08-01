@@ -9,6 +9,9 @@
     <!-- Sesli komut -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
+    <!-- Bildirimler (Android 13+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <!-- Erişilebilirlik -->
     <uses-permission android:name="android.permission.BIND_ACCESSIBILITY_SERVICE"
         tools:ignore="ProtectedPermissions"
@@ -29,10 +32,18 @@
             </intent-filter>
         </activity>
 
+        <!-- Bildirimden açılan sesli komut overlay'i -->
+        <activity
+            android:name=".VoiceCommandActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AppCompat.Dialog"
+            android:launchMode="singleTask"
+            android:excludeFromRecents="true" />
+
         <service
             android:name=".DomatesAccessibilityService"
             android:exported="true"
-            android:label="DOMATES Agent"
+            android:label="DOMATES Ajan"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
             <intent-filter>
                 <action android:name="android.accessibilityservice.AccessibilityService" />

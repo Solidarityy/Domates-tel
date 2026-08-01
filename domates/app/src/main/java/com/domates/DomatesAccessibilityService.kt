@@ -2,11 +2,19 @@ package com.domates
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Intent
+import android.graphics.drawable.Icon
 import android.util.DisplayMetrics
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 
 private const val TAG = "DomatesService"
+private const val KANAL_ID = "domates_aktif"
+private const val BILDIRIM_ID = 1
 
 class DomatesAccessibilityService : AccessibilityService() {
 
@@ -23,7 +31,6 @@ class DomatesAccessibilityService : AccessibilityService() {
         super.onCreate()
         instance = this
         metrics = resources.displayMetrics
-        Log.i(TAG, "DOMATES Accessibility Service created")
     }
 
     override fun onServiceConnected() {
@@ -45,31 +52,71 @@ class DomatesAccessibilityService : AccessibilityService() {
         collector = ScreenStateCollector(metrics.widthPixels, metrics.heightPixels)
         executor = ActionExecutor(this, metrics.widthPixels, metrics.heightPixels)
 
-        Log.i(TAG, "DOMATES connected — ${metrics.widthPixels}x${metrics.heightPixels}")
+        Log.i(TAG, "DOMATES bağlandı — ${metrics.widthPixels}x${metrics.heightPixels}")
+        bildirimiGoster()
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {}
 
     override fun onInterrupt() {
-        Log.w(TAG, "Accessibility service interrupted")
+        Log.w(TAG, "Servis kesintiye uğradı")
     }
 
     override fun onDestroy() {
+        bildirimiGizle()
         instance = null
         super.onDestroy()
     }
 
     fun captureAndReply(requestId: String) {
-        val client = MainActivity.menemenClient ?: run {
-            Log.w(TAG, "No MenemenClient available")
-            return
-        }
-
+        val client = MainActivity.menemenClient ?: return
         val root = rootInActiveWindow
         val tree = collector.collectTree(root)
         root?.recycle()
-
-        // Screenshot devre dışı — accessibility tree yeterli
         client.sendScreenState(requestId, tree, screenshotB64 = null)
+    }
+
+    // ─── Bildirim ────────────────────────────────────────────────────────
+
+    private fun bildirimiGoster() {
+        val nm = getSystemService(NotificationManager::class.java)
+
+        val kanal = NotificationChannel(
+            KANAL_ID, "DOMATES Servisi",
+            NotificationManager.IMPORTANCE_LOW
+        ).apply {
+            description = "DOMATES erişilebilirlik servisi aktif"
+            setShowBadge(false)
+        }
+        nm.createNotificationChannel(kanal)
+
+        val sesliIntent = Intent(this, VoiceCommandActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val sesliPending = PendingIntent.getActivity(
+            this, 0, sesliIntent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
+        val sesliAksiyon = Notification.Action.Builder(
+            Icon.createWithResource(this, android.R.drawable.ic_btn_speak_now),
+            "🎤  Sesli Komut",
+            sesliPending
+        ).build()
+
+        val bildirim = Notification.Builder(this, KANAL_ID)
+            .setSmallIcon(android.R.drawable.ic_btn_speak_now)
+            .setContentTitle("🍅 DOMATES Aktif")
+            .setContentText("Sesli komut göndermek için dokunun")
+            .setOngoing(true)
+            .setContentIntent(sesliPending)
+            .addAction(sesliAksiyon)
+            .build()
+
+        nm.notify(BILDIRIM_ID, bildirim)
+    }
+
+    private fun bildirimiGizle() {
+        getSystemService(NotificationManager::class.java).cancel(BILDIRIM_ID)
     }
 }
