@@ -1,0 +1,17 @@
+# MENEMEN Runtime Configuration
+# Copy to config.yaml and fill in your values.
+# Alternatively, every setting can be overridden via environment variables.
+
+anthropic_api_key: "sk-ant-..."   # or set ANTHROPIC_API_KEY env var
+claude_model: "claude-sonnet-4-6"
+
+server:
+  host: "0.0.0.0"
+  port: 8765
+
+agent:
+  max_steps: 30
+  step_timeout_sec: 10.0
+  max_tree_tokens: 4096
+  vision_fallback: true
+  min_tree_nodes: 5

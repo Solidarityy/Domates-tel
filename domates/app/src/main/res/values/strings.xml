@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">DOMATES</string>
+    <string name="accessibility_service_description">
+        DOMATES Agent — Executes UI actions on behalf of the MENEMEN AI brain.
+        Requires full screen access to read UI state and perform gestures.
+    </string>
+</resources>
