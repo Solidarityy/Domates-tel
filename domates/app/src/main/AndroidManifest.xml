@@ -2,11 +2,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.domates">
 
-    <!-- Network -->
+    <!-- Ağ -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
-    <!-- Accessibility actions -->
+    <!-- Sesli komut -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- Erişilebilirlik -->
     <uses-permission android:name="android.permission.BIND_ACCESSIBILITY_SERVICE"
         tools:ignore="ProtectedPermissions"
         xmlns:tools="http://schemas.android.com/tools" />
