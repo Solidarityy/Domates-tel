@@ -1,5 +1,6 @@
 """
-Thin wrapper around the Anthropic SDK that drives the ReAct tool-use loop.
+Calls the Claude Messages API directly via httpx — no Rust-compiled dependencies.
+Pure-Python replacement for the anthropic SDK, compatible with Termux on Android.
 """
 from __future__ import annotations
 
@@ -7,12 +8,15 @@ import json
 import logging
 from typing import Any
 
-import anthropic
+import httpx
 
 from .action_schemas import MENEMEN_TOOLS, AnyAction
 from .config import config
 
 log = logging.getLogger(__name__)
+
+_API_URL = "https://api.anthropic.com/v1/messages"
+_API_VERSION = "2023-06-01"
 
 SYSTEM_PROMPT = """You are MENEMEN, the brain of a mobile automation agent running on Android.
 
@@ -31,8 +35,15 @@ Rules:
 
 class MenemenLLM:
     def __init__(self) -> None:
-        self._client = anthropic.Anthropic(api_key=config.anthropic_api_key)
         self._messages: list[dict] = []
+        self._http = httpx.Client(
+            timeout=60.0,
+            headers={
+                "x-api-key": config.anthropic_api_key,
+                "anthropic-version": _API_VERSION,
+                "content-type": "application/json",
+            },
+        )
 
     def reset(self) -> None:
         self._messages = []
@@ -79,39 +90,46 @@ class MenemenLLM:
         Returns (tool_use_id, action_dict).
         Raises RuntimeError if Claude doesn't call a tool.
         """
-        # On the very first call, prepend the task as the first user message.
         if not self._messages:
             self._messages.append(
                 {"role": "user", "content": f"TASK: {task}"}
             )
 
-        response = self._client.messages.create(
-            model=config.claude_model,
-            max_tokens=1024,
-            system=SYSTEM_PROMPT,
-            tools=MENEMEN_TOOLS,
-            tool_choice={"type": "any"},  # force a tool call every turn
-            messages=self._messages,
-        )
+        payload = {
+            "model": config.claude_model,
+            "max_tokens": 1024,
+            "system": SYSTEM_PROMPT,
+            "tools": MENEMEN_TOOLS,
+            "tool_choice": {"type": "any"},
+            "messages": self._messages,
+        }
 
-        log.debug("LLM stop_reason=%s", response.stop_reason)
+        resp = self._http.post(_API_URL, content=json.dumps(payload))
 
-        # Extract the tool use block
+        if resp.status_code != 200:
+            raise RuntimeError(
+                f"Claude API error {resp.status_code}: {resp.text[:400]}"
+            )
+
+        data = resp.json()
+        log.debug("LLM stop_reason=%s", data.get("stop_reason"))
+
+        # Find the tool_use block in the response content list
+        content_blocks: list[dict] = data.get("content", [])
         tool_block = next(
-            (b for b in response.content if b.type == "tool_use"),
+            (b for b in content_blocks if b.get("type") == "tool_use"),
             None,
         )
 
         if tool_block is None:
-            # Should not happen with tool_choice=any, but guard defensively
             text = " ".join(
-                b.text for b in response.content if hasattr(b, "text")
+                b.get("text", "") for b in content_blocks if b.get("type") == "text"
             )
             raise RuntimeError(f"No tool call from LLM. Text: {text[:200]}")
 
-        # Append the assistant turn to history
-        self._messages.append({"role": "assistant", "content": response.content})
+        # Append assistant turn to history (raw dicts — no SDK objects)
+        self._messages.append({"role": "assistant", "content": content_blocks})
 
-        action: AnyAction = {"type": tool_block.name, **tool_block.input}
+        action: AnyAction = {"type": tool_block["name"], **tool_block["input"]}
         log.info("Action: %s", json.dumps(action, ensure_ascii=False))
-        return tool_block.id, action
+        return tool_block["id"], action
