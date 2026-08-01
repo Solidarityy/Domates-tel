@@ -36,7 +36,7 @@ Rules:
 class MenemenLLM:
     def __init__(self) -> None:
         self._messages: list[dict] = []
-        self._http = httpx.Client(
+        self._http = httpx.AsyncClient(
             timeout=60.0,
             headers={
                 "x-api-key": config.anthropic_api_key,
@@ -84,7 +84,7 @@ class MenemenLLM:
             }
         )
 
-    def next_action(self, task: str) -> tuple[str, AnyAction]:
+    async def next_action(self, task: str) -> tuple[str, AnyAction]:
         """
         Run one inference step.
         Returns (tool_use_id, action_dict).
@@ -104,7 +104,7 @@ class MenemenLLM:
             "messages": self._messages,
         }
 
-        resp = self._http.post(_API_URL, content=json.dumps(payload))
+        resp = await self._http.post(_API_URL, content=json.dumps(payload))
 
         if resp.status_code != 200:
             raise RuntimeError(
@@ -114,7 +114,6 @@ class MenemenLLM:
         data = resp.json()
         log.debug("LLM stop_reason=%s", data.get("stop_reason"))
 
-        # Find the tool_use block in the response content list
         content_blocks: list[dict] = data.get("content", [])
         tool_block = next(
             (b for b in content_blocks if b.get("type") == "tool_use"),
@@ -127,7 +126,6 @@ class MenemenLLM:
             )
             raise RuntimeError(f"No tool call from LLM. Text: {text[:200]}")
 
-        # Append assistant turn to history (raw dicts — no SDK objects)
         self._messages.append({"role": "assistant", "content": content_blocks})
 
         action: AnyAction = {"type": tool_block["name"], **tool_block["input"]}

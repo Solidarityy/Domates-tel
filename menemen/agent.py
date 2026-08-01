@@ -75,7 +75,7 @@ class MenemenAgent:
             )
 
             # 2. Ask Claude for next action
-            tool_use_id, action = self._llm.next_action(task)
+            tool_use_id, action = await self._llm.next_action(task)
 
             # 3. Handle terminal actions
             if action["type"] == "done":

@@ -38,7 +38,6 @@ import uuid
 from typing import Any
 
 import websockets
-from websockets.server import WebSocketServerProtocol
 
 from .agent import MenemenAgent
 from .config import config
@@ -49,7 +48,7 @@ log = logging.getLogger(__name__)
 class DeviceSession:
     """Manages one connected DOMATES device."""
 
-    def __init__(self, ws: WebSocketServerProtocol) -> None:
+    def __init__(self, ws: Any) -> None:
         self.ws = ws
         # Pending futures keyed by request_id
         self._pending_screens: dict[str, asyncio.Future] = {}
@@ -69,7 +68,7 @@ class DeviceSession:
 
     async def request_screen(self) -> tuple[dict, str | None]:
         req_id = str(uuid.uuid4())
-        fut: asyncio.Future = asyncio.get_event_loop().create_future()
+        fut: asyncio.Future = asyncio.get_running_loop().create_future()
         self._pending_screens[req_id] = fut
         await self._send({"type": "screen_request", "request_id": req_id})
         payload = await asyncio.wait_for(fut, timeout=config.step_timeout_sec)
@@ -77,7 +76,7 @@ class DeviceSession:
 
     async def send_action(self, action: dict) -> None:
         req_id = str(uuid.uuid4())
-        fut: asyncio.Future = asyncio.get_event_loop().create_future()
+        fut: asyncio.Future = asyncio.get_running_loop().create_future()
         self._pending_acks[req_id] = fut
         await self._send({"type": "action", "request_id": req_id, **action})
         ack = await asyncio.wait_for(fut, timeout=config.step_timeout_sec)
@@ -114,7 +113,7 @@ class DeviceSession:
                 log.error("Error parsing message: %s", exc)
 
 
-async def _handle_connection(ws: WebSocketServerProtocol) -> None:
+async def _handle_connection(ws: Any) -> None:
     addr = ws.remote_address
     log.info("DOMATES connected from %s", addr)
     session = DeviceSession(ws)
