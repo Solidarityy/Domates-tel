@@ -1,15 +1,12 @@
 package com.domates
 
-import android.app.Activity
 import android.content.Context
 import android.content.Intent
-import android.media.projection.MediaProjectionManager
 import android.os.Bundle
 import android.provider.Settings
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 
-private const val REQ_MEDIA_PROJECTION = 1001
 private const val PREFS_NAME = "domates_prefs"
 private const val KEY_SERVER_URL = "server_url"
 
@@ -25,8 +22,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var runButton: Button
     private lateinit var statusView: TextView
     private lateinit var permissionButton: Button
-
-    private var pendingTask: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -123,23 +118,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        // Request MediaProjection for screenshots
-        pendingTask = task
-        val projectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-        startActivityForResult(projectionManager.createScreenCaptureIntent(), REQ_MEDIA_PROJECTION)
-    }
-
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == REQ_MEDIA_PROJECTION) {
-            if (resultCode == Activity.RESULT_OK && data != null) {
-                val projManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-                val projection = projManager.getMediaProjection(resultCode, data)
-                DomatesAccessibilityService.instance?.mediaProjection = projection
-            }
-            pendingTask?.let { startTask(urlInput.text.toString().trim(), it) }
-            pendingTask = null
-        }
+        startTask(url, task)
     }
 
     private fun startTask(url: String, task: String) {
