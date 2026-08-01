@@ -20,7 +20,8 @@
     <application
         android:label="DOMATES"
         android:theme="@style/Theme.AppCompat.Light"
-        android:allowBackup="true">
+        android:allowBackup="true"
+        android:usesCleartextTraffic="true">
 
         <activity
             android:name=".MainActivity"
