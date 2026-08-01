@@ -7,6 +7,9 @@ on:
     branches: ["**"]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -49,6 +52,17 @@ jobs:
           name: DOMATES-release
           path: domates/app/build/outputs/apk/release/app-release.apk
           retention-days: 30
+
+      - name: Publish APK to GitHub Releases
+        run: |
+          gh release delete domates-latest --yes 2>/dev/null || true
+          gh release create domates-latest \
+            --title "DOMATES Son Sürüm" \
+            --notes "Otomatik derleme — doğrudan APK olarak indir ve kur." \
+            --prerelease \
+            domates/app/build/outputs/apk/release/app-release.apk#DOMATES.apk
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Show APK info
         run: |
