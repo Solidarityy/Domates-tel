@@ -39,19 +39,19 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x domates/gradlew
 
-      - name: Build Debug APK
+      - name: Build Release APK
         working-directory: domates
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: DOMATES-debug
-          path: domates/app/build/outputs/apk/debug/app-debug.apk
+          name: DOMATES-release
+          path: domates/app/build/outputs/apk/release/app-release.apk
           retention-days: 30
 
       - name: Show APK info
         run: |
-          APK=domates/app/build/outputs/apk/debug/app-debug.apk
+          APK=domates/app/build/outputs/apk/release/app-release.apk
           echo "APK size: $(du -sh $APK | cut -f1)"
           echo "Build successful ✓"

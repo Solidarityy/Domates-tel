@@ -1,5 +1,5 @@
 .gradle/
 build/
 local.properties
-*.keystore
 *.jks
+# domates.keystore repo'da tutuluyor (CI signing için)
