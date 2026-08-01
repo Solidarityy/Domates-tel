@@ -5,8 +5,7 @@ Every action Menemen can send to Domates is defined here as a TypedDict
 so both sides share a single source of truth.
 """
 from __future__ import annotations
-from typing import Literal, Union
-from typing_extensions import TypedDict
+from typing import Literal, TypedDict, Union
 
 
 class ClickAction(TypedDict):
