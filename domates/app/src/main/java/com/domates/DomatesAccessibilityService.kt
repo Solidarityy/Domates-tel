@@ -34,26 +34,34 @@ class DomatesAccessibilityService : AccessibilityService() {
     }
 
     override fun onServiceConnected() {
-        super.onServiceConnected()
-        instance = this
+        Log.i(TAG, "onServiceConnected başladı")
+        try {
+            super.onServiceConnected()
+            instance = this
 
-        val info = AccessibilityServiceInfo().apply {
-            eventTypes = AccessibilityEvent.TYPES_ALL_MASK
-            feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC
-            flags = (
-                AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS
-                or AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
-                or AccessibilityServiceInfo.FLAG_REQUEST_ENHANCED_WEB_ACCESSIBILITY
-            )
-            notificationTimeout = 100
+            val info = AccessibilityServiceInfo().apply {
+                eventTypes = AccessibilityEvent.TYPES_ALL_MASK
+                feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC
+                flags = AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS or
+                        AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
+                notificationTimeout = 100
+            }
+            serviceInfo = info
+            Log.i(TAG, "serviceInfo ayarlandı")
+
+            collector = ScreenStateCollector(metrics.widthPixels, metrics.heightPixels)
+            executor = ActionExecutor(this, metrics.widthPixels, metrics.heightPixels)
+            Log.i(TAG, "DOMATES bağlandı — ${metrics.widthPixels}x${metrics.heightPixels}")
+
+            try {
+                bildirimiGoster()
+                Log.i(TAG, "Bildirim gösterildi")
+            } catch (e: Exception) {
+                Log.e(TAG, "Bildirim hatası", e)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "onServiceConnected crash", e)
         }
-        serviceInfo = info
-
-        collector = ScreenStateCollector(metrics.widthPixels, metrics.heightPixels)
-        executor = ActionExecutor(this, metrics.widthPixels, metrics.heightPixels)
-
-        Log.i(TAG, "DOMATES bağlandı — ${metrics.widthPixels}x${metrics.heightPixels}")
-        bildirimiGoster()
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {}
