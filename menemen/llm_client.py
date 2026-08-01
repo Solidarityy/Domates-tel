@@ -1,6 +1,6 @@
 """
-Calls the Claude Messages API directly via httpx — no Rust-compiled dependencies.
-Pure-Python replacement for the anthropic SDK, compatible with Termux on Android.
+Calls Groq's OpenAI-compatible API via httpx.
+Free tier: console.groq.com — no credit card required.
 """
 from __future__ import annotations
 
@@ -15,12 +15,11 @@ from .config import config
 
 log = logging.getLogger(__name__)
 
-_API_URL = "https://api.anthropic.com/v1/messages"
-_API_VERSION = "2023-06-01"
+_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 SYSTEM_PROMPT = """You are MENEMEN, the brain of a mobile automation agent running on Android.
 
-Your job is to complete the user's task by issuing one tool call at a time.
+Your job is to complete the user's task by calling one tool at a time.
 After each action you will receive the updated screen state.
 Think step by step but ACT immediately — do not explain your reasoning in text.
 
@@ -29,8 +28,24 @@ Rules:
 - If the screen hasn't changed after an action, try a different approach.
 - Never ask the user a clarifying question; make your best guess and proceed.
 - If you cannot complete the task after several attempts, call done() with an honest failure summary.
-- Always call done() when the task is finished, never leave the loop open-ended.
+- Always call done() when the task is finished.
 """
+
+# Convert Anthropic tool format → OpenAI tool format
+def _to_openai_tools(tools: list[dict]) -> list[dict]:
+    result = []
+    for t in tools:
+        result.append({
+            "type": "function",
+            "function": {
+                "name": t["name"],
+                "description": t.get("description", ""),
+                "parameters": t.get("input_schema", {}),
+            }
+        })
+    return result
+
+_OAI_TOOLS = _to_openai_tools(MENEMEN_TOOLS)
 
 
 class MenemenLLM:
@@ -39,9 +54,8 @@ class MenemenLLM:
         self._http = httpx.AsyncClient(
             timeout=60.0,
             headers={
-                "x-api-key": config.anthropic_api_key,
-                "anthropic-version": _API_VERSION,
-                "content-type": "application/json",
+                "Authorization": f"Bearer {config.groq_api_key}",
+                "Content-Type": "application/json",
             },
         )
 
@@ -49,85 +63,46 @@ class MenemenLLM:
         self._messages = []
 
     def add_screen_state(self, state_json: str, screenshot_b64: str | None = None) -> None:
-        """Append an observation (screen state) to the conversation."""
-        content: list[Any] = [
-            {
-                "type": "text",
-                "text": f"<screen_state>\n{state_json}\n</screen_state>",
-            }
-        ]
-        if screenshot_b64:
-            content.append(
-                {
-                    "type": "image",
-                    "source": {
-                        "type": "base64",
-                        "media_type": "image/png",
-                        "data": screenshot_b64,
-                    },
-                }
-            )
-        self._messages.append({"role": "user", "content": content})
+        self._messages.append({
+            "role": "user",
+            "content": f"<screen_state>\n{state_json}\n</screen_state>",
+        })
 
     def add_tool_result(self, tool_use_id: str, result: str) -> None:
-        """Append the result of a previous tool call."""
-        self._messages.append(
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "tool_result",
-                        "tool_use_id": tool_use_id,
-                        "content": result,
-                    }
-                ],
-            }
-        )
+        self._messages.append({
+            "role": "tool",
+            "tool_call_id": tool_use_id,
+            "content": result,
+        })
 
     async def next_action(self, task: str) -> tuple[str, AnyAction]:
-        """
-        Run one inference step.
-        Returns (tool_use_id, action_dict).
-        Raises RuntimeError if Claude doesn't call a tool.
-        """
         if not self._messages:
-            self._messages.append(
-                {"role": "user", "content": f"TASK: {task}"}
-            )
+            self._messages.append({"role": "user", "content": f"TASK: {task}"})
 
         payload = {
-            "model": config.claude_model,
+            "model": config.llm_model,
             "max_tokens": 1024,
-            "system": SYSTEM_PROMPT,
-            "tools": MENEMEN_TOOLS,
-            "tool_choice": {"type": "any"},
-            "messages": self._messages,
+            "messages": [{"role": "system", "content": SYSTEM_PROMPT}] + self._messages,
+            "tools": _OAI_TOOLS,
+            "tool_choice": "required",
         }
 
         resp = await self._http.post(_API_URL, content=json.dumps(payload))
 
         if resp.status_code != 200:
-            raise RuntimeError(
-                f"Claude API error {resp.status_code}: {resp.text[:400]}"
-            )
+            raise RuntimeError(f"Groq API error {resp.status_code}: {resp.text[:400]}")
 
         data = resp.json()
-        log.debug("LLM stop_reason=%s", data.get("stop_reason"))
+        message = data["choices"][0]["message"]
 
-        content_blocks: list[dict] = data.get("content", [])
-        tool_block = next(
-            (b for b in content_blocks if b.get("type") == "tool_use"),
-            None,
-        )
-
-        if tool_block is None:
-            text = " ".join(
-                b.get("text", "") for b in content_blocks if b.get("type") == "text"
-            )
+        tool_calls = message.get("tool_calls")
+        if not tool_calls:
+            text = message.get("content", "")
             raise RuntimeError(f"No tool call from LLM. Text: {text[:200]}")
 
-        self._messages.append({"role": "assistant", "content": content_blocks})
+        self._messages.append(message)
 
-        action: AnyAction = {"type": tool_block["name"], **tool_block["input"]}
+        tc = tool_calls[0]
+        action: AnyAction = {"type": tc["function"]["name"], **json.loads(tc["function"]["arguments"])}
         log.info("Action: %s", json.dumps(action, ensure_ascii=False))
-        return tool_block["id"], action
+        return tc["id"], action
